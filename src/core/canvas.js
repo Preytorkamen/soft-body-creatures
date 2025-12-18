@@ -24,4 +24,21 @@ export function createCanvas(canvas) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
+    function clear() {
+        // Because transform maps to CSS pixels, clear with view.w / view.h
+        ctx.clearRect(0, 0, view.w, view.h);
+    }
+
+    // If not full-window, or if adding camera transforms later
+    function clientToCanvas(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    // Helper for pixel-perfect 1px lines on DPR screens
+    function setPixelRatioTransform() {
+        ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    }
+
+    return { canvas, ctx, view, resize, clear, clientToCanvas, setPixelRatioTransform };
 }
