@@ -1,34 +1,44 @@
-const canvas = document.getElementById("c");
-if (!canvas) throw new Error("Could not find canvas #c");
+export function createCanvas(canvas) {    
+    if (!canvas) throw new Error("Could not find canvas #c");
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not find 2d context");
+    
+    const view = { w: 0, h: 0, dpr: 1 };
 
-const ctx = canvas.getContext("2d");
-if (!ctx) throw new Error("Could not find 2d context");
+    // Resize / DPR-correct rendering   
+    function resize() {
+        
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
 
+        view.dpr = dpr;
+        view.w = Math.round(rect.width);
+        view.h = Math.round(rect.height);
 
-// Resize / DPR-correct rendering
-/* My understanding is that we need to create a canvas rendering fix that makes
-the graphics look crisp and correctly scaled, particularly on high-resolution screens,
-like Retina displays.*/
+        // Backing buffer size in device pixels
+        canvas.width = Math.floor(view.w * dpr);
+        canvas.height = Math.floor(view.h * dpr);
 
-function resize() {
+        // Keep drawing units in CSS pixels
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
-    // Set pixel size of the canvas, scaled up for high DPI screens
-    canvas.width = innerWidth * devicePixelRatio;
-    canvas.height = innerHeight * devicePixelRatio;
+    function clear() {
+        // Because transform maps to CSS pixels, clear with view.w / view.h
+        ctx.clearRect(0, 0, view.w, view.h);
+    }
 
-    // Make canvas fill the window properly
-    canvas.style.width = innerWidth + "px";
-    canvas.style.height = innerHeight + "px";
+    // If not full-window, or if adding camera transforms later
+    function clientToCanvas(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
 
-    // Scale drawn stuff to match CSS pixels
-    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    // Helper for pixel-perfect 1px lines on DPR screens
+    function setPixelRatioTransform() {
+        ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    }
 
-    // Keep center-stuff centered
-    world.home.x = innerWidth * 0.5;
-    world.home.y = innerHeight * 0.5;
-    world.hive.x = world.home.x;
-    world.hive.y = world.home.y;
+    return { canvas, ctx, view, resize, clear, clientToCanvas, setPixelRatioTransform };
 }
-
-addEventListener("resize", resize);
-resize();
