@@ -97,84 +97,175 @@ export class Amoeba {
     }
 
   draw(ctx) {
-    ctx.save();
+  ctx.save();
 
-    const steps = 72;
-    const base = this.r;
-    const t = this.t;
+  const steps = 72;
+  const base = this.r;
+  const t = this.t;
 
-    // motion-derived (set in sim)
-    const speed = Math.min(this.rSpeed || 0, 160);
-    const dir = Number.isFinite(this.rHeading) ? this.rHeading : 0;
-    const s = this.deform;
+  // motion-derived (set in sim)
+  const speed = Math.min(this.rSpeed || 0, 160);
+  const dir = Number.isFinite(this.rHeading) ? this.rHeading : 0;
+  const s = this.deform;
 
-    const p = this.pulse;       // acceleration pulse
-    const tp = this.turnPulse;  // turn pulse
+  const p  = this.pulse;       // acceleration pulse
+  const tp = this.turnPulse;   // turn pulse
 
+  // deformation controls (your originals, kept)
+  const bulgeF = (3 * s) * (3 * p);
+  const bulgeB = 10 * s;
 
-    // deformation controls
-    const bulgeF = (10 + 18 * s) * (1 + 0.25 * p); // extra thrust when accelerating
-    const bulgeB = 2 + 6 * s;
+  const sideSquish = (0.10 + 0.28 * s) * base * (1 + 0.55 * tp);
+  const waveAmp = 2.5 * (1 - s) + 1.5 * p;
 
-    const sideSquish = (0.10 + 0.18 * s) * base * (1 + 0.55 * tp); // tighter on turns
-    const waveAmp = 2.5 + 2.2 * (1 - s) + 1.5 * p; // “alive” surface response
+  const areaComp = 1 - 0.10 * s;
 
+  // ---- Lighting setup (NEW) ----
+  // Slightly "top-left" key light, plus a small push in travel direction
+  const key = -0.9; // radians-ish bias via vector below (no need to be exact)
+  const lx = Math.cos(-Math.PI * 0.35) + Math.cos(dir) * 0.55;
+  const ly = Math.sin(-Math.PI * 0.35) + Math.sin(dir) * 0.55;
 
-    // small area-ish compensation so it doesn't inflate too much
-    const areaComp = 1 - 0.10 * s;
+  // normalize
+  const lm = Math.hypot(lx, ly) || 1;
+  const Lx = lx / lm;
+  const Ly = ly / lm;
 
-    // Gradient shifts toward travel direction
-    const gx = this.x + Math.cos(dir) * (6 + 10 * s);
-    const gy = this.y + Math.sin(dir) * (6 + 10 * s);
+  // speed-driven "juice"
+  const v = Math.max(0, Math.min(1, speed / 140)); // 0..1
 
-    const g = ctx.createRadialGradient(
-      gx, gy, base * 0.15,
-      this.x, this.y, base * 1.25
-    );
-    g.addColorStop(0,   "rgba(120, 160, 120, 0.9)");
-    g.addColorStop(0.7, "rgba(180, 220, 180, 0.4)");
-    g.addColorStop(1,   "rgba(203, 255, 203, 0.65)");
+  // centers for gradients / highlights
+  const cx = this.x, cy = this.y;
 
-    ctx.beginPath();
+  // Highlight sits toward light direction
+  const hx = cx + Lx * base * (0.42 + 0.07 * v);
+  const hy = cy + Ly * base * (0.28 + 0.07 * v);
 
-    for (let i = 0; i <= steps; i++) {
-      const a = (i / steps) * Math.PI * 2;
+  // Shadow core sits opposite light direction
+  const sx0 = cx - Lx * base * (0.18 + 0.04 * v);
+  const sy0 = cy - Ly * base * (0.18 + 0.04 * v);
 
-      // relative to travel direction
-      const rel = a - dir;
-      const forward = Math.cos(rel);   // -1..1
-      const side = Math.sin(rel);      // -1..1
+  // ---- Build blob path (unchanged shape) ----
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
 
-      // directional bulge: front grows more than back
-      const dirBulge =
-        (forward > 0 ? forward * bulgeF : forward * bulgeB);
+    const rel = a - dir;
+    const forward = Math.cos(rel);
+    const side = Math.sin(rel);
 
-      // squish sides (strongest at ±90°)
-      const squish = -sideSquish * (side * side);
+    const dirBulge = (forward > 0 ? forward * bulgeF : forward * bulgeB);
+    const squish = -sideSquish * (side * side);
 
-      // surface wave (slows down when moving fast)
-      const wave =
-        Math.sin(a * 3 + t * (1.2 + 0.8 * s)) * waveAmp +
-        Math.sin(a * 7 - t * (0.9 + 0.5 * s)) * (waveAmp * 0.35);
+    const wave =
+      Math.sin(a * 3 + t * (1.2 + 0.8 * s)) * waveAmp +
+      Math.sin(a * 7 - t * (0.9 + 0.5 * s)) * (waveAmp * 0.35);
 
-      const rr = base * areaComp + dirBulge + squish + wave;
+    const rr = base * areaComp + dirBulge + squish + wave;
 
-      const px = this.x + Math.cos(a) * rr;
-      const py = this.y + Math.sin(a) * rr;
+    const px = cx + Math.cos(a) * rr;
+    const py = cy + Math.sin(a) * rr;
 
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-
-    ctx.closePath();
-    ctx.fillStyle = g;
-    ctx.fill();
-
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 1.2 + 0.6 * (1 - s);
-    ctx.strokeStyle = "rgba(255,255,255,0.8)";
-    ctx.stroke();
-
-    ctx.restore();
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
+  ctx.closePath();
+
+  // ---- 1) Soft outer glow (NEW) ----
+  // Makes it feel gel-like and separates from background without sticker stroke
+  ctx.save();
+  ctx.shadowColor = "rgba(220, 255, 230, 0.22)";
+  ctx.shadowBlur = 14 + 10 * (1 - s);
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.fillStyle = "rgba(210, 255, 220, 0.10)";
+  ctx.fill();
+  ctx.restore();
+
+  // ---- 2) Main subsurface fill (NEW palette) ----
+  // Cool-ish shadow core -> mint body -> warm highlight rim
+  const body = ctx.createRadialGradient(
+    sx0, sy0, base * 0.10,
+    cx,  cy,  base * 1.25
+  );
+
+  // Shadow core (cool green / teal)
+  body.addColorStop(0.0, "rgba(126, 214, 187, 0.7)");
+  body.addColorStop(0.34, "rgba(47, 146, 102, 0.45)");
+
+  // Main body (fresh mint)
+  body.addColorStop(0.45, "rgba(165, 235, 190, 0.12)");
+  body.addColorStop(0.78, "rgba(195, 255, 215, 0.63)");
+
+  // Edge (slightly warmer, more translucent)
+  body.addColorStop(1.00, "rgba(113, 255, 141, 0.44)");
+
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  // ---- 3) Inner depth vignette (NEW) ----
+  // Adds "volume" without muddying the edges
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  const core = ctx.createRadialGradient(
+    cx, cy, base * 0.05,
+    cx, cy, base * 1.00
+  );
+  core.addColorStop(0.00, "rgba(120, 170, 140, 0.55)");
+  core.addColorStop(0.60, "rgba(120, 170, 140, 0.18)");
+  core.addColorStop(1.00, "rgba(120, 170, 140, 0.00)");
+  ctx.fillStyle = core;
+  ctx.fill();
+  ctx.restore();
+
+  // ---- 4) Gel highlights (NEW) ----
+  // Broad soft highlight
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const broad = ctx.createRadialGradient(
+    hx, hy, base * 0.05,
+    hx, hy, base * (0.85 + 0.10 * v)
+  );
+  broad.addColorStop(0.00, "rgba(255, 255, 255, 0.24)");
+  broad.addColorStop(0.45, "rgba(255, 255, 255, 0.10)");
+  broad.addColorStop(1.00, "rgba(255, 255, 255, 0.00)");
+  ctx.fillStyle = broad;
+  ctx.fill();
+
+  // Small specular "spark" (sharper)
+  const shx = hx + Lx * base * 0.10;
+  const shy = hy + Ly * base * 0.10;
+  const spark = ctx.createRadialGradient(
+    shx, shy, 0,
+    shx, shy, base * (0.18 + 0.06 * v)
+  );
+  spark.addColorStop(0.00, "rgba(255, 255, 255, 0.55)");
+  spark.addColorStop(0.35, "rgba(255, 255, 255, 0.18)");
+  spark.addColorStop(1.00, "rgba(255, 255, 255, 0.00)");
+  ctx.fillStyle = spark;
+  ctx.fill();
+  ctx.restore();
+
+  // ---- 5) Rim + subtle dark edge (replaces sticker stroke) ----
+  // Dark edge adds definition; light rim adds "wet" feel.
+  // Dark edge
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 1.0 + 0.6 * (1 - s);
+  ctx.strokeStyle = "rgba(40, 80, 70, 0.22)";
+  ctx.stroke();
+  ctx.restore();
+
+  // Light rim (thin)
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 0.9 + 0.5 * (1 - s);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
 }
