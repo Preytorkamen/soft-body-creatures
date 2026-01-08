@@ -29,7 +29,7 @@ export class Amoeba {
         this.state = AmoebaState.IDLE;
         this.stateTime = 0;
 
-        this.t = 0; // Deterministic
+        //this.t = 0; // Deterministic
 
         this.rSpeed = 0;      // smoothed speed for rendering
         this.rHeading = 0;    // smoothed heading for rendering
