@@ -24,7 +24,7 @@ export class Amoeba {
         this.id = id;
         this.t = id * 0.37; // deterministic phase
         this.stateTime = (id * 0.13) % 0.8; // desync state
-        this.targetN = 0;  // increments each time we pick a target
+        this.targetN = 0;  // increments each time a target is picked
 
         this.state = AmoebaState.IDLE;
         this.stateTime = 0;
@@ -53,7 +53,7 @@ export class Amoeba {
         const speed = Math.hypot(this.vx, this.vy);
         const heading = Math.atan2(this.vy, this.vx);
 
-        // smoothing constants (tune these)
+        // smoothing constants
         const speedSmooth = 19; // higher = faster response
         const headSmooth  = 22;
 
@@ -82,11 +82,11 @@ export class Amoeba {
 
         const accel = Math.hypot(dvx, dvy) / Math.max(1e-6, dt); // px/s^2-ish
 
-        // turn rate (how fast heading changes)
+        // turn rate
         const dHead = ((heading - this.rHeading + Math.PI) % (Math.PI * 2)) - Math.PI;
         const turnRate = Math.abs(dHead) / Math.max(1e-6, dt);
 
-        // map to 0..1 activations (tune thresholds)
+        // map to 0..1 activations
         const accelAct = clamp01((accel - 40) / 220);     // start pulsing when accelerating
         const turnAct  = clamp01((turnRate - 2.0) / 10);  // start pulsing on sharp turns
 
@@ -111,7 +111,7 @@ export class Amoeba {
   const p  = this.pulse;       // acceleration pulse
   const tp = this.turnPulse;   // turn pulse
 
-  // deformation controls (your originals, kept)
+  // deformation controls
   const bulgeF = (3 * s) * (3 * p);
   const bulgeB = 10 * s;
 
@@ -120,9 +120,8 @@ export class Amoeba {
 
   const areaComp = 1 - 0.10 * s;
 
-  // ---- Lighting setup (NEW) ----
   // Slightly "top-left" key light, plus a small push in travel direction
-  const key = -0.9; // radians-ish bias via vector below (no need to be exact)
+  const key = -0.9;
   const lx = Math.cos(-Math.PI * 0.35) + Math.cos(dir) * 0.55;
   const ly = Math.sin(-Math.PI * 0.35) + Math.sin(dir) * 0.55;
 
@@ -145,7 +144,7 @@ export class Amoeba {
   const sx0 = cx - Lx * base * (0.18 + 0.04 * v);
   const sy0 = cy - Ly * base * (0.18 + 0.04 * v);
 
-  // ---- Build blob path (unchanged shape) ----
+  // Build blob path
   ctx.beginPath();
   for (let i = 0; i <= steps; i++) {
     const a = (i / steps) * Math.PI * 2;
@@ -171,8 +170,7 @@ export class Amoeba {
   }
   ctx.closePath();
 
-  // ---- 1) Soft outer glow (NEW) ----
-  // Makes it feel gel-like and separates from background without sticker stroke
+  // Makes it feel gel-like
   ctx.save();
   ctx.shadowColor = "rgba(220, 255, 230, 0.22)";
   ctx.shadowBlur = 14 + 10 * (1 - s);
@@ -182,7 +180,6 @@ export class Amoeba {
   ctx.fill();
   ctx.restore();
 
-  // ---- 2) Main subsurface fill (NEW palette) ----
   // Cool-ish shadow core -> mint body -> warm highlight rim
   const body = ctx.createRadialGradient(
     sx0, sy0, base * 0.10,
@@ -203,7 +200,6 @@ export class Amoeba {
   ctx.fillStyle = body;
   ctx.fill();
 
-  // ---- 3) Inner depth vignette (NEW) ----
   // Adds "volume" without muddying the edges
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -218,7 +214,6 @@ export class Amoeba {
   ctx.fill();
   ctx.restore();
 
-  // ---- 4) Gel highlights (NEW) ----
   // Broad soft highlight
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -246,8 +241,6 @@ export class Amoeba {
   ctx.fill();
   ctx.restore();
 
-  // ---- 5) Rim + subtle dark edge (replaces sticker stroke) ----
-  // Dark edge adds definition; light rim adds "wet" feel.
   // Dark edge
   ctx.save();
   ctx.lineJoin = "round";
